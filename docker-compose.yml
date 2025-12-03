@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  portainer-initiator:
+    build: .
+    restart: unless-stopped
+    environment:
+      - PORTAINER_URL=${PORTAINER_URL}
+      - PORTAINER_API_KEY=${PORTAINER_API_KEY}
+      - STACK_SEQUENCE=${STACK_SEQUENCE}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS:-5}
+      - POLL_TIMEOUT_SECONDS=${POLL_TIMEOUT_SECONDS:-300}
+      - VERIFY_TLS=${VERIFY_TLS:-true}

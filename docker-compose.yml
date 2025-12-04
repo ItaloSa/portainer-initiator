@@ -3,7 +3,7 @@ version: "3.9"
 services:
   portainer-initiator:
     build: .
-    restart: unless-stopped
+    restart: always
     network_mode: "host"
     environment:
       - PORTAINER_URL=${PORTAINER_URL}

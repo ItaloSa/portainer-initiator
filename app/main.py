@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import threading
 from typing import List
 
 from app.config import Settings
@@ -54,7 +55,7 @@ class StackStarter:
             logger.error("Timed out waiting for stack %s to become healthy", stack_id)
         return running
 
-    def run(self) -> int:
+    def run(self) -> bool:
         for stack_id in self.settings.stack_sequence:
             logger.info("Processing stack %s", stack_id)
             if not self.ensure_stack_running(stack_id):
@@ -62,11 +63,21 @@ class StackStarter:
                     "stack_failed",
                     {"stack_id": stack_id, "message": "Failed to start or verify stack"},
                 )
-                return 1
+                return False
 
         self.notify("stack_sequence_complete", {"stacks": self.settings.stack_sequence})
         logger.info("All stacks started successfully")
-        return 0
+        return True
+
+
+def _wait_for_manual_stop() -> None:
+    logger.info("Waiting for manual shutdown (Ctrl+C or docker stop)...")
+    stop_event = threading.Event()
+    try:
+        while not stop_event.wait(timeout=60):
+            continue
+    except KeyboardInterrupt:
+        logger.info("Shutdown requested; exiting")
 
 
 def main(argv: List[str] | None = None) -> int:
@@ -74,10 +85,23 @@ def main(argv: List[str] | None = None) -> int:
         settings = Settings.load()
     except Exception as exc:  # noqa: BLE001
         logger.error("Configuration error: %s", exc)
-        return 1
+        _wait_for_manual_stop()
+        return 0
 
     starter = StackStarter(settings)
-    return starter.run()
+    try:
+        succeeded = starter.run()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Unexpected error while starting stacks: %s", exc)
+        succeeded = False
+
+    if succeeded:
+        logger.info("Stack startup sequence completed; keeping container running for manual stop")
+    else:
+        logger.error("Stack startup sequence failed; keeping container running for manual stop")
+
+    _wait_for_manual_stop()
+    return 0
 
 
 if __name__ == "__main__":
